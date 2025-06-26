@@ -1,0 +1,21 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "server.js",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "/server.js"
+    }
+  ],
+  "env": {
+    "MONGO_URI": "@mongo_uri",
+    "NODE_ENV": "production",
+    "JWT_SECRET": "@jwt_secret",
+    "BCRYPT_SALT_ROUNDS": "12"
+  }
+}
