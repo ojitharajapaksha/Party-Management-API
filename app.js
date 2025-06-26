@@ -1,5 +1,6 @@
 const express = require('express');
 const mongoose = require('mongoose');
+const cors = require('cors');
 require('dotenv').config();
 
 const individualRoutes = require('./routes/individualRoutes');
@@ -7,14 +8,64 @@ const organizationRoutes = require('./routes/organizationRoutes');
 
 const app = express();
 
-app.use(express.json());
+// CORS configuration
+app.use(cors({
+  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept']
+}));
 
-mongoose.connect(process.env.MONGO_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-}).then(() => console.log('MongoDB connected')).catch(console.error);
+// Body parsing middleware
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true }));
 
+// MongoDB connection
+const mongoUri = process.env.MONGO_URI || 'mongodb://localhost:27017/party-management';
+mongoose.connect(mongoUri)
+.then(() => console.log('MongoDB connected to:', mongoUri.replace(/\/\/.*@/, '//***:***@')))
+.catch(err => {
+  console.error('MongoDB connection error:', err);
+  process.exit(1);
+});
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({ status: 'OK', timestamp: new Date().toISOString() });
+});
+
+// API routes
 app.use('/tmf-api/party/v5/individual', individualRoutes);
 app.use('/tmf-api/party/v5/organization', organizationRoutes);
+
+// 404 handler
+app.use('*', (req, res) => {
+  res.status(404).json({
+    error: 'Not Found',
+    message: `Route ${req.originalUrl} not found`,
+    availableRoutes: [
+      'GET /health',
+      'POST /tmf-api/party/v5/individual',
+      'GET /tmf-api/party/v5/individual',
+      'GET /tmf-api/party/v5/individual/:id',
+      'PATCH /tmf-api/party/v5/individual/:id',
+      'DELETE /tmf-api/party/v5/individual/:id',
+      'POST /tmf-api/party/v5/organization',
+      'GET /tmf-api/party/v5/organization',
+      'GET /tmf-api/party/v5/organization/:id',
+      'PATCH /tmf-api/party/v5/organization/:id',
+      'DELETE /tmf-api/party/v5/organization/:id'
+    ]
+  });
+});
+
+// Global error handler
+app.use((err, req, res, next) => {
+  console.error('Error:', err);
+  res.status(err.status || 500).json({
+    error: err.message || 'Internal Server Error',
+    ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
+  });
+});
 
 module.exports = app;
